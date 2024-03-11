@@ -1,54 +1,63 @@
 package checkin.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
-import org.springframework.validation.ObjectError;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.Objects;
+import java.util.Date;
 
 @Service
+@Slf4j
 public class CheckInService {
 
-    final static String loginUrl = "https://tms.blueeye.ai/api/user/login";
-    final static String infoUrl = "https://tms.blueeye.ai/api/user/get-user-info";
-    final static String checkinUrl = "https://tms.blueeye.ai/api/timesheet/checkin_online";
+    @Value("${tms.login.url}")
+    String loginUrl;
 
-    public boolean checkin() {
-        boolean isChecked = false;
+    @Value("${tms.info.url}")
+    String infoUrl;
+
+    @Value("${tms.checkin.url}")
+    String checkinUrl;
+
+    @Autowired
+    MailService mailService;
+
+    public void checkin() {
         try {
+            log.info("Start checkin : {}", new Date());
             RestTemplate restTemplate = new RestTemplate();
             ObjectMapper mapper = new ObjectMapper();
             ObjectNode body = mapper.createObjectNode();
             body.put("badgeNumber", "6888");
             body.put("password", "seta@123");
             ResponseEntity<ObjectNode> response = restTemplate.postForEntity(loginUrl, body, ObjectNode.class);
-            System.out.println(response.getBody().toString());
-            System.out.println(response.getHeaders().get("Set-Cookie").get(0));
+            log.info("Login: {}\n {}\n {}", loginUrl, body, response);
 
             HttpHeaders headers = new HttpHeaders();
             headers.add("Cookie", response.getHeaders().get("Set-Cookie").get(0) );
 
-            HttpEntity<String> entity = new HttpEntity<>("{\"comment\":\"\"}", headers);
+            body = mapper.createObjectNode();
+            body.put("comment", "");
+            HttpEntity<ObjectNode> entity = new HttpEntity<ObjectNode>(body, headers);
 
             response = restTemplate.exchange(checkinUrl, HttpMethod.POST, entity, ObjectNode.class);
             String checkIn = response.getBody().path("data").path("checkIn").asText("");
-            System.out.println(checkIn);
-            if (!"".equals(checkIn)) {
-                isChecked = true;
-            }
+
+            log.info("CheckIn: {}\n {}\n {}", checkinUrl, body, response);
+
+            mailService.sendMail("Checked in at " + checkIn);
         } catch (Exception ex) {
+            log.error("Error: {}", ex.getMessage());
             ex.printStackTrace();
         }
-        return isChecked;
     }
 
 }
