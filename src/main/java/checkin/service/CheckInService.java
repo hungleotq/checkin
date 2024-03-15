@@ -39,7 +39,7 @@ public class CheckInService {
     private final static DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     @Retryable(retryFor = Exception.class,
-            backoff = @Backoff(delay = 1000))
+            backoff = @Backoff(delayExpression = "${retry.maxDelay}"))
     public void checkin() {
         log.info("Start checkin : {}", LocalDateTime.now().format(formatter));
         RestTemplate restTemplate = new RestTemplate();
@@ -49,7 +49,6 @@ public class CheckInService {
         body.put("password", "seta@123");
         ResponseEntity<ObjectNode> response = restTemplate.postForEntity(loginUrl, body, ObjectNode.class);
         log.info("Login: {}\n {}\n {}", loginUrl, body, response);
-
         HttpHeaders headers = new HttpHeaders();
         headers.add("Cookie", response.getHeaders().get("Set-Cookie").get(0) );
 
